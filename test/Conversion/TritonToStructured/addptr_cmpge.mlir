@@ -94,3 +94,30 @@ tt.func public @test_negative_shift_lower_bound(%arg0: !tt.ptr<f32>) -> tensor<4
 // CHECK-LABEL:   tt.func public @test_negative_shift_lower_bound
 // CHECK-NOT:       tts.load
 // CHECK:           tt.load {{.*}}, {{.*}} : tensor<4x!tt.ptr<f32>>
+
+// -----
+
+// A range shifted by -1 and then offset again, as Inductor emits for padded
+// pooling windows, can be negative, so `>= 0` must keep the load masked.
+tt.func public @test_nested_negative_shift_lower_bound(%arg0: !tt.ptr<f32>, %arg1: i32) -> tensor<4xf32> {
+  %cst_neg1 = arith.constant dense<-1> : tensor<4xi32>
+  %cst_0 = arith.constant dense<0> : tensor<4xi32>
+  %cst_6 = arith.constant dense<6> : tensor<4xi32>
+  %c2_i32 = arith.constant 2 : i32
+  %0 = tt.make_range {end = 4 : i32, start = 0 : i32} : tensor<4xi32>
+  %1 = arith.addi %cst_neg1, %0 : tensor<4xi32>
+  %2 = arith.muli %arg1, %c2_i32 : i32
+  %3 = tt.splat %2 : i32 -> tensor<4xi32>
+  %4 = arith.addi %1, %3 : tensor<4xi32>
+  %5 = arith.cmpi sge, %4, %cst_0 : tensor<4xi32>
+  %6 = arith.cmpi slt, %4, %cst_6 : tensor<4xi32>
+  %7 = arith.andi %5, %6 : tensor<4xi1>
+  %8 = tt.splat %arg0 : !tt.ptr<f32> -> tensor<4x!tt.ptr<f32>>
+  %9 = tt.addptr %8, %4 : tensor<4x!tt.ptr<f32>>, tensor<4xi32>
+  %10 = tt.load %9, %7 : tensor<4x!tt.ptr<f32>>
+  tt.return %10 : tensor<4xf32>
+}
+
+// CHECK-LABEL:   tt.func public @test_nested_negative_shift_lower_bound
+// CHECK-NOT:       tts.load
+// CHECK:           tt.load {{.*}}, {{.*}} : tensor<4x!tt.ptr<f32>>

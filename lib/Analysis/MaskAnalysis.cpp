@@ -217,7 +217,9 @@ LogicalResult MaskState::addStates(const MaskState &lhsState,
     return failure();
   }
 
+  // Keep a negative shift from an inner add, e.g. (-1 + range) + offset.
   this->seenRangeNegativeShift =
+      lhsState.seenRangeNegativeShift || rhsState.seenRangeNegativeShift ||
       hasNegativeConst(lhsState.scalar) || hasNegativeConst(rhsState.scalar);
   if (lhsState.scalar)
     return addStateScalar(rhsState, lhsState.scalar, loc, builder);
