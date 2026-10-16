@@ -217,6 +217,8 @@ LogicalResult MaskState::addStates(const MaskState &lhsState,
     return failure();
   }
 
+  this->seenRangeNegativeShift =
+      hasNegativeConst(lhsState.scalar) || hasNegativeConst(rhsState.scalar);
   if (lhsState.scalar)
     return addStateScalar(rhsState, lhsState.scalar, loc, builder);
   else
@@ -531,9 +533,11 @@ LogicalResult MaskState::parseCmp(arith::CmpIOp cmpOp, const Location loc,
 
   // We only support sge against 0 for lower bounds. Dims already has an
   // implicit assumption that the lower bound is 0, so if we see this, assume
-  // the comparison evaluates to true.
+  // the comparison evaluates to true. That assumption does not hold when a
+  // negative constant was added to the range (e.g. arange - 1), so bail out.
   if (cmpOp.getPredicate() == arith::CmpIPredicate::sge &&
-      !(rhsState.scalar && hasConstZero(rhsState.scalar))) {
+      (!(rhsState.scalar && hasConstZero(rhsState.scalar)) ||
+       lhsState.seenRangeNegativeShift)) {
     LLVM_DEBUG({
       InFlightDiagnostic diag =
           emitRemark(loc, "Unsupported cmpi with rhs not equal to 0");

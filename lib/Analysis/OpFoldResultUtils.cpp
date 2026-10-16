@@ -52,6 +52,23 @@ bool hasConstZero(const OpFoldResult ofr) {
   return false;
 }
 
+bool hasNegativeConst(const OpFoldResult ofr) {
+  if (!ofr)
+    return false;
+  auto intAttr = getIntAttr(ofr);
+  if (intAttr.has_value())
+    return intAttr.value() < 0;
+
+  auto val = dyn_cast<Value>(ofr);
+  assert(val);
+  auto constOp = val.getDefiningOp<arith::ConstantOp>();
+  if (!constOp)
+    return false;
+
+  intAttr = getIntAttr(constOp.getValue());
+  return intAttr.has_value() && intAttr.value() < 0;
+}
+
 Value ofrToValue(const OpFoldResult ofr, const Location loc, OpBuilder &b) {
   if (Value val = dyn_cast<Value>(ofr)) {
     return val;

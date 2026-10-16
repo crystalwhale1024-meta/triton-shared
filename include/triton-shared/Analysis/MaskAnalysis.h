@@ -67,6 +67,8 @@ struct MaskState {
   SmallVector<Value> masks;
   OpFoldResult scalar;
   const bool useUnsafeMask;
+  // A negative constant was added to the range, so its start may be below 0.
+  bool seenRangeNegativeShift = false;
 
   void dump() const;
 

@@ -71,3 +71,26 @@ tt.func public @test_masked_store(%arg0: !tt.ptr<f16>) {
 // CHECK-DAG:       [[VAR_0_:%.+]] = tts.make_tptr [[arg0_]] to sizes: [16, 16], strides: [1, 0], offsets: [0, 0], shape: [0, 0], order: [] : <f16> to tensor<16x16x!tt.ptr<f16>>
 // CHECK:           "tts.store"([[VAR_0_]], [[VAR_cst_]]) <{static_mask_dims = array<i64: 16, 16>}> : (tensor<16x16x!tt.ptr<f16>>, tensor<16x16xf16>) -> ()
 // CHECK:         }
+
+// -----
+
+// A range shifted by a negative constant can be below 0, so `>= 0` must keep
+// the load masked instead of being treated as always true.
+tt.func public @test_negative_shift_lower_bound(%arg0: !tt.ptr<f32>) -> tensor<4xf32> {
+  %cst_neg1 = arith.constant dense<-1> : tensor<4xi32>
+  %cst_0 = arith.constant dense<0> : tensor<4xi32>
+  %cst_4 = arith.constant dense<4> : tensor<4xi32>
+  %0 = tt.make_range {end = 4 : i32, start = 0 : i32} : tensor<4xi32>
+  %1 = arith.addi %0, %cst_neg1 : tensor<4xi32>
+  %2 = arith.cmpi sge, %1, %cst_0 : tensor<4xi32>
+  %3 = arith.cmpi slt, %1, %cst_4 : tensor<4xi32>
+  %4 = arith.andi %2, %3 : tensor<4xi1>
+  %5 = tt.splat %arg0 : !tt.ptr<f32> -> tensor<4x!tt.ptr<f32>>
+  %6 = tt.addptr %5, %1 : tensor<4x!tt.ptr<f32>>, tensor<4xi32>
+  %7 = tt.load %6, %4 : tensor<4x!tt.ptr<f32>>
+  tt.return %7 : tensor<4xf32>
+}
+
+// CHECK-LABEL:   tt.func public @test_negative_shift_lower_bound
+// CHECK-NOT:       tts.load
+// CHECK:           tt.load {{.*}}, {{.*}} : tensor<4x!tt.ptr<f32>>

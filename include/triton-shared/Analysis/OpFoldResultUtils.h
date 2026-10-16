@@ -27,6 +27,10 @@ std::optional<int64_t> getIntAttr(const OpFoldResult ofr);
 // attribute or a constant value.
 bool hasConstZero(const OpFoldResult ofr);
 
+// Return true if ofr is a negative integer constant, held either as an
+// attribute or as an arith.constant value.
+bool hasNegativeConst(const OpFoldResult ofr);
+
 // Cast OpFoldResult to Value.
 Value ofrToValue(const OpFoldResult ofr, const Location loc, OpBuilder &b);
 
