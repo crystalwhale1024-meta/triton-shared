@@ -218,6 +218,11 @@ static unsigned int getBitWidth(Type type) {
   return 0;
 }
 
+static bool hasPointerLikeResult(scf::IfOp ifOp) {
+  return llvm::any_of(ifOp.getResultTypes(),
+                      [](Type type) { return triton::isPtrTypeLike(type); });
+}
+
 class TritonToUnstructuredPass
     : public ::impl::TritonToUnstructuredBase<TritonToUnstructuredPass> {
 
@@ -319,11 +324,15 @@ public:
                   return success();
                 })
                 .Case<triton::AddPtrOp>([&](triton::AddPtrOp addptr) {
-                  // Bail when we have an addptr in an scf.if as we  do not know
-                  // if the pointer returning from both branches will have the
-                  // same source
-                  if (addptr->getParentOfType<scf::IfOp>()) {
-                    return failure();
+                  // Pointer arithmetic local to an scf.if is safe to process.
+                  // If the scf.if itself returns a pointer-like value, however,
+                  // the pointer may come from different sources in the
+                  // then/else branches. Handling that requires propagating and
+                  // reconciling PtrOffset across the scf.if.
+                  if (auto ifOp = addptr->getParentOfType<scf::IfOp>()) {
+                    if (hasPointerLikeResult(ifOp)) {
+                      return failure();
+                    }
                   }
 
                   OpBuilder b{addptr};
