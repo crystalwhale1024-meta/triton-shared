@@ -787,16 +787,21 @@ LogicalResult MaskState::parseLoopIterArg(Value v, const Location loc,
       }
     }
 
-    if (!lhsState.start && !lhsState.end) {
-      assert(lhsState.scalar && "MaskState must have a scalar");
-      lhsState.start = builder.getIndexAttr(0);
-      lhsState.end = lhsState.scalar;
+    Value offset = forOp.getRegionIterArg(argIndex + 1);
+    if (lhsState.scalar) {
+      auto type = dyn_cast<RankedTensorType>(v.getType());
+      if (!type || type.getRank() != 1 || type.getDimSize(0) != 1) {
+        return failure();
+      }
+      this->dims.push_back(builder.getIndexAttr(1));
+      this->scalar = offset;
+      return success();
     }
 
-    auto dist = subOFRs(lhsState.end, lhsState.start, loc, builder);
-    this->start = forOp.getRegionIterArg(argIndex + 1);
-    this->end = addOFRs(this->start, dist, loc, builder);
     this->dims = lhsState.dims;
+    auto dist = subOFRs(lhsState.end, lhsState.start, loc, builder);
+    this->start = offset;
+    this->end = addOFRs(this->start, dist, loc, builder);
 
     return success();
   }
